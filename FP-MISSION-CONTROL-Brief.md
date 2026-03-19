@@ -1,397 +1,388 @@
-# FP Mission Control
-## Project Brief & Implementation Checklist
-
-**A real-time project dashboard for the FlatPlanet ecosystem**
-
-> v1.0 · 2026-03-19 · FlatPlanet-Hub
-
----
-
-| | |
-|---|---|
-| **Service name** | FP Mission Control |
-| **Repository** | https://github.com/FlatPlanet-Hub/FP-MISSION-CONTROL |
-| **Database** | Supabase (shared with FP Data Dictionary — same dedicated FlatPlanet instance) |
-| **Dashboard hosting** | Netlify |
-| **Who writes to it** | Claude Code only — at the end of every session, automatically |
-| **Who reads it** | Anyone at FlatPlanet — dashboard is accessible to all |
-| **Why it exists** | Give FlatPlanet leadership real-time visibility into every project — what is being built, how far along it is, what the blockers are, and when things are due — without anyone having to manually report status |
+# FP Mission Control — Project Specification
+**Version:** 1.0
+**Status:** Awaiting build — Phase 1 not yet started
+**Repo (to be created):** FlatPlanet-Hub/FP-MISSION-CONTROL
+**Prepared by:** Claude Code — Session 1
+**Date:** 2026-03-19
 
 ---
 
-## 1. The Problem This Solves
+## 1. Vision
 
-FlatPlanet is scaling from one project to many projects running in parallel across the business. Business line managers are experimenting and spinning up new projects. Without a central view, leadership has no visibility into what is happening across the portfolio.
+FP Mission Control is FlatPlanet's central project intelligence system. It gives leadership real-time visibility into every project across the organisation — what is being built, who is building it, how far along it is, what the blockers are, and when things are due.
 
-> **Core problem:** Status reporting is manual, inconsistent, and always out of date. Nobody has time to write status reports. When they do, they are already stale.
-
-| Approach | What happens |
-|---|---|
-| **Manual status reporting** | People forget. Reports are inconsistent. Language varies. Leadership chases updates. Information is always behind reality. |
-| **FP Mission Control (this)** | Claude writes the status at the end of every session as a matter of standard process. The dashboard updates automatically. Leadership sees the current state of every project without asking anyone. |
-
-The key insight: **Claude is already doing the work at session end**. Mission Control simply captures that work as structured data and makes it visible.
+It is not a manual project management tool. It is fed automatically by Claude at the end of every development session. No human data entry is required for status updates. Claude writes the data; humans read the dashboard.
 
 ---
 
-## 2. What FP Mission Control Is
+## 2. Core Principles
 
-FP Mission Control is a web dashboard backed by a Supabase database. It shows the live state of every FlatPlanet project in one place.
-
-At the end of every Claude Code session, Claude writes structured data to the Mission Control API — project status, session summary, objective progress, checklist completions, and any blockers. The dashboard reflects this immediately.
-
-There is no manual data entry. There is no separate reporting process. The act of closing a Claude session is the act of updating the dashboard.
-
-| What you can see | Detail |
-|---|---|
-| All projects at a glance | Name, status, version, % complete, nearest deadline, last session date |
-| Project drill-down | Full objectives list with deadlines and progress, checklist items, session history, open blockers |
-| Planning timeline | All objectives across all projects on a single timeline, sorted by deadline |
-| Blockers board | Everything currently blocked across all projects in one view |
-| Session history | Every session logged — what was done, what version closed, who worked on it |
+- **Claude is the data entry mechanism.** At the end of every session, Claude updates Mission Control automatically as part of the session close protocol.
+- **No manual status updates.** If it requires a human to type a status update, it is not working correctly.
+- **One source of truth.** The Supabase database is canonical. The GitHub markdown backup is human-readable but secondary.
+- **Properly architected from day one.** Built to scale to any number of projects, teams, and business units.
+- **Deadlines and planning are first-class.** Not an afterthought — objectives have deadlines, checklists have owners, timelines are visible from day one.
 
 ---
 
-## 3. Architecture
-
-### Separation of concerns
-
-FP Mission Control is a separate repository and service from FP Data Dictionary. FP Data Dictionary is a read-only standards service — it tells Claude what names and types to use. FP Mission Control is a write-capable project management service — it records what Claude did. They share the same Supabase instance but have separate schemas and separate APIs.
+## 3. System Architecture
 
 ```
-FP-DATA-DICTIONARY        FP-MISSION-CONTROL
-  Read-only API       +     Read/write API
-  Standards data            Project management data
-       ↑                          ↑  ↓
-  Claude reads              Claude writes (session end)
-  before coding             Dashboard reads (real-time)
+┌─────────────────────────────────────────────────────┐
+│                   Claude Session                     │
+│  (any FlatPlanet project — Tala, FP-DATA-DICTIONARY │
+│   FP-MISSION-CONTROL, or any future project)        │
+└───────────────────┬─────────────────────────────────┘
+                    │ Session ends
+                    ▼
+┌─────────────────────────────────────────────────────┐
+│              Session Close Protocol                  │
+│  Claude writes structured data to:                  │
+│  1. FP Mission Control API (primary)                │
+│  2. GitHub /projects/ folder (markdown backup)      │
+└───────────┬─────────────────────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────┐
+│           FP Mission Control API                     │
+│  Node.js / TypeScript                               │
+│  Deployed on Netlify Functions                      │
+│  Repo: FlatPlanet-Hub/FP-MISSION-CONTROL            │
+└───────────┬─────────────────────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────┐
+│              Supabase Database                       │
+│  Dedicated FlatPlanet infrastructure instance       │
+│  Shared with FP-DATA-DICTIONARY                     │
+└───────────┬─────────────────────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────┐
+│           Mission Control Dashboard                  │
+│  React web app — hosted on Netlify                  │
+│  Reads from Supabase in real time                   │
+│  Repo: FlatPlanet-Hub/FP-MISSION-CONTROL            │
+└─────────────────────────────────────────────────────┘
 ```
 
-### Database — Supabase
+---
 
-Shared FlatPlanet Supabase instance. Mission Control data lives in its own tables, separate from the standards tables.
+## 4. Data Model
 
-#### Core tables
+### 4.1 Table: `projects`
+The master registry of all FlatPlanet projects.
 
-| Table | Purpose |
-|---|---|
-| `projects` | One row per FlatPlanet project — name, status, repo, owner, current version |
-| `objectives` | Goals belonging to a project — what the project is trying to achieve, with a deadline |
-| `checklist_items` | Tasks under an objective — each is either done or not done |
-| `sessions` | One row per Claude Code session — date, version at close, summary, worked on by |
-| `session_updates` | Individual bullet points from a session — what was done |
-| `blockers` | Open issues flagged by Claude — description, severity, opened and resolved dates |
-
-#### Schema detail
-
-**projects**
-| Field | Type | Notes |
+| Column | Type | Notes |
 |---|---|---|
-| id | string | fp_proj_ prefixed ULID |
-| name | string | Human display name |
-| slug | string | kebab-case, unique |
-| description | string | 2-3 sentences, plain English |
-| status | string | active, paused, blocked, complete, archived |
-| repo_url | string | GitHub URL |
-| dashboard_url | string | Live URL if deployed |
-| owner | string | Role title — never a personal name |
-| current_version | string | MAJOR.MINOR.PATCH |
-| created_at | string | ISO 8601 |
-| updated_at | string | ISO 8601 |
+| id | text (PK) | Prefix: `fp_proj_` + ULID |
+| name | text | Display name e.g. "Tala On Demand" |
+| slug | text (unique) | URL-safe e.g. `tala-ondemand` |
+| description | text | One paragraph summary |
+| status | text | `active` \| `paused` \| `blocked` \| `complete` \| `archived` |
+| repo_url | text | GitHub repo URL |
+| deploy_url | text | Live URL if applicable |
+| business_unit | text | e.g. "On Demand", "FlatPlanet Hub" |
+| tech_stack | text[] | Array of technologies |
+| current_version | text | e.g. "v1.7.1" |
+| created_at | timestamptz | |
+| updated_at | timestamptz | Auto-updated |
 
-**objectives**
-| Field | Type | Notes |
-|---|---|---|
-| id | string | fp_obj_ prefixed ULID |
-| project_id | string | FK to projects |
-| title | string | Plain English goal statement |
-| description | string | More detail if needed |
-| status | string | not_started, in_progress, complete, cancelled |
-| due_at | string | ISO 8601 — the deadline |
-| sort_order | integer | Manual ordering within a project |
-| completed_at | string | ISO 8601 — when status moved to complete |
-| created_at | string | ISO 8601 |
-| updated_at | string | ISO 8601 |
+---
 
-**checklist_items**
-| Field | Type | Notes |
-|---|---|---|
-| id | string | fp_chk_ prefixed ULID |
-| objective_id | string | FK to objectives |
-| project_id | string | FK to projects — denormalised for query performance |
-| title | string | Plain English task description |
-| status | string | todo, done |
-| sort_order | integer | Manual ordering within an objective |
-| completed_at | string | ISO 8601 — when ticked off |
-| created_at | string | ISO 8601 |
-| updated_at | string | ISO 8601 |
+### 4.2 Table: `objectives`
+Goals that a project is working toward. Each objective has a deadline.
 
-**sessions**
-| Field | Type | Notes |
+| Column | Type | Notes |
 |---|---|---|
-| id | string | fp_ses_ prefixed ULID |
-| project_id | string | FK to projects |
+| id | text (PK) | Prefix: `fp_obj_` + ULID |
+| project_id | text (FK) | → projects.id |
+| title | text | e.g. "Invoice System Complete" |
+| description | text | What done looks like |
+| status | text | `not_started` \| `in_progress` \| `complete` \| `cancelled` |
+| due_at | date | Target completion date |
+| completed_at | timestamptz | Set when status → complete |
+| sort_order | integer | Display order within project |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+---
+
+### 4.3 Table: `checklist_items`
+Discrete tasks under an objective. Completion drives the progress percentage.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | text (PK) | Prefix: `fp_chk_` + ULID |
+| objective_id | text (FK) | → objectives.id |
+| project_id | text (FK) | → projects.id (denormalised for query speed) |
+| title | text | e.g. "Build Supabase schema" |
+| status | text | `todo` \| `in_progress` \| `done` \| `cancelled` |
+| completed_at | timestamptz | Set when status → done |
+| sort_order | integer | Display order within objective |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+---
+
+### 4.4 Table: `sessions`
+One row per Claude session per project. The living history of project work.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | text (PK) | Prefix: `fp_ses_` + ULID |
+| project_id | text (FK) | → projects.id |
 | session_number | integer | Incrementing per project |
-| session_date | string | ISO 8601 date |
-| version_at_close | string | MAJOR.MINOR.PATCH |
-| summary | string | Current state of the project at close |
-| worked_on_by | string | Claude model version or role title |
-| created_at | string | ISO 8601 |
-
-**session_updates**
-| Field | Type | Notes |
-|---|---|---|
-| id | string | fp_upd_ prefixed ULID |
-| session_id | string | FK to sessions |
-| project_id | string | FK to projects |
-| description | string | One plain English bullet point |
-| sort_order | integer | Order within the session |
-| created_at | string | ISO 8601 |
-
-**blockers**
-| Field | Type | Notes |
-|---|---|---|
-| id | string | fp_blk_ prefixed ULID |
-| project_id | string | FK to projects |
-| description | string | Plain English — what is blocked and why |
-| severity | string | low, medium, high, critical |
-| status | string | open, resolved |
-| opened_at | string | ISO 8601 |
-| resolved_at | string | ISO 8601 — null if still open |
-| created_at | string | ISO 8601 |
-| updated_at | string | ISO 8601 |
-
-### API — REST Endpoints
-
-The Mission Control API handles writes from Claude and reads from the dashboard. All Claude writes happen at session end via a single session-close call.
-
-| Endpoint | Method | What it does |
-|---|---|---|
-| `/v1/projects` | GET | List all projects with current status and progress |
-| `/v1/projects/:slug` | GET | Full project detail — objectives, checklist, sessions, blockers |
-| `/v1/projects` | POST | Register a new project (first session only) |
-| `/v1/projects/:slug` | PATCH | Update project status, version, description |
-| `/v1/projects/:slug/objectives` | GET | List objectives for a project |
-| `/v1/projects/:slug/objectives` | POST | Add a new objective |
-| `/v1/objectives/:id` | PATCH | Update objective status, deadline, sort order |
-| `/v1/objectives/:id/checklist` | GET | List checklist items for an objective |
-| `/v1/objectives/:id/checklist` | POST | Add a checklist item |
-| `/v1/checklist/:id` | PATCH | Tick or untick a checklist item |
-| `/v1/projects/:slug/sessions` | POST | Log a new session — the primary session-end write |
-| `/v1/projects/:slug/blockers` | GET | List open blockers |
-| `/v1/projects/:slug/blockers` | POST | Add a blocker |
-| `/v1/blockers/:id` | PATCH | Resolve a blocker |
-| `/v1/planning` | GET | All objectives across all projects sorted by due_at |
-
-### Session-close write
-
-When Claude closes a session, it makes one structured API call to `/v1/projects/:slug/sessions` with a payload that includes the session summary, version at close, list of updates (bullets), checklist items to mark done, objective status changes, and any new or resolved blockers. The API handles all the writes atomically.
-
-Claude never makes multiple separate calls at session end. One call. One payload. Done.
-
-### Dashboard — React on Netlify
-
-A web application reading from the Mission Control API. No authentication required for viewing — the dashboard is visible to anyone at FlatPlanet.
-
-**Views:**
-
-1. **Portfolio view** — grid of all project cards. Each card shows: project name, status badge, owner, current version, overall % complete (computed from checklist items), nearest objective deadline, days since last session.
-
-2. **Project view** — drill into a single project. Shows: project description, all objectives with progress bars and deadlines, checklist items per objective, open blockers, session history timeline.
-
-3. **Planning view** — horizontal timeline. All objectives from all projects, plotted by deadline. Colour-coded by project. Shows what is due when across the entire portfolio.
-
-4. **Blockers view** — table of all open blockers across all projects, sorted by severity. One place to see everything that is stuck.
+| session_date | date | Date of session |
+| summary | text | What was accomplished this session |
+| decisions | text | Key decisions made |
+| next_steps | text | What happens next session |
+| version_at_close | text | Version number at session end |
+| created_at | timestamptz | |
 
 ---
 
-## 4. How Claude Uses Mission Control
+### 4.5 Table: `blockers`
+Anything preventing progress. Flagged by Claude, cleared by Claude.
 
-Every FlatPlanet project CLAUDE.md includes the Mission Control API endpoint and the session-close instructions.
+| Column | Type | Notes |
+|---|---|---|
+| id | text (PK) | Prefix: `fp_blk_` + ULID |
+| project_id | text (FK) | → projects.id |
+| description | text | What is blocked and why |
+| status | text | `open` \| `resolved` |
+| raised_at | timestamptz | |
+| resolved_at | timestamptz | Set when status → resolved |
+| resolution_note | text | How it was resolved |
 
-### Session open (first session only — registering a new project)
+---
 
-Call `POST /v1/projects` with the project name, slug, repo URL, owner, and description. This registers the project in Mission Control. Objectives and checklist items are added in this same session or as they become known.
+### 4.6 Computed Values (no stored columns needed)
 
-### During a session
+| Value | Calculation |
+|---|---|
+| Objective % complete | `done checklist_items / total checklist_items` × 100 |
+| Project % complete | Average of all objective % complete values |
+| Days until due | `objective.due_at - today` |
+| Overdue | `due_at < today AND status != complete` |
 
-Claude may call `POST /v1/projects/:slug/blockers` if a blocker is discovered mid-session. Everything else waits for session close.
+---
 
-### Session close (every session, without exception)
+## 5. API Design
 
-Claude calls `POST /v1/projects/:slug/sessions` with:
-
-```json
-{
-  "session_number": 42,
-  "session_date": "2026-03-19",
-  "version_at_close": "1.7.1",
-  "worked_on_by": "claude-sonnet-4-6",
-  "summary": "Current state of the project in 2-5 plain English sentences.",
-  "updates": [
-    "Fixed the utilisation calculation to exclude absent staff",
-    "Updated index.html to v1.7.1"
-  ],
-  "checklist_completions": ["fp_chk_01j9x...", "fp_chk_01j9y..."],
-  "objective_updates": [
-    { "id": "fp_obj_01j9x...", "status": "in_progress" }
-  ],
-  "resolved_blockers": ["fp_blk_01j9x..."],
-  "new_blockers": [
-    { "description": "Awaiting Supabase credentials from Chris", "severity": "high" }
-  ]
-}
+### 5.1 Base URL
+```
+https://fp-mission-control.netlify.app/.netlify/functions/
 ```
 
-The session is not closed until this call succeeds and returns `200`. Claude confirms the write before ending the session.
+### 5.2 Endpoints
+
+#### Projects
+```
+GET    /projects                  — list all projects
+GET    /projects/:slug            — get project + objectives + latest session
+POST   /projects                  — create project
+PATCH  /projects/:id              — update project status, version, etc.
+```
+
+#### Objectives
+```
+GET    /projects/:id/objectives   — list objectives for a project
+POST   /projects/:id/objectives   — create objective
+PATCH  /objectives/:id            — update status, due date, etc.
+```
+
+#### Checklist Items
+```
+GET    /objectives/:id/checklist  — list items for an objective
+POST   /objectives/:id/checklist  — add item
+PATCH  /checklist/:id             — mark done/todo/cancelled
+```
+
+#### Sessions
+```
+POST   /sessions                  — log a session (called at session end)
+GET    /projects/:id/sessions     — session history for a project
+```
+
+#### Blockers
+```
+POST   /blockers                  — raise a blocker
+PATCH  /blockers/:id              — resolve a blocker
+GET    /projects/:id/blockers     — all blockers for a project (open first)
+```
+
+#### Dashboard
+```
+GET    /dashboard                 — all projects with latest session + open blockers + objective progress
+```
+
+### 5.3 Authentication
+All write endpoints (`POST`, `PATCH`) require a `x-api-key` header. API key stored in Netlify environment variables. Read endpoints (`GET`) are public (dashboard is read-only).
 
 ---
 
-## 5. How Objectives and Checklists Work
+## 6. Claude Session Close Protocol
 
-### Objectives
+At the end of every session on any FlatPlanet project, Claude MUST:
 
-An objective is a meaningful goal with a deadline. It is not a task — it is an outcome. Examples:
+1. **Update project status** — `PATCH /projects/:id` with current status and version
+2. **Tick completed checklist items** — `PATCH /checklist/:id` for each item completed this session
+3. **Log the session** — `POST /sessions` with summary, decisions, next steps
+4. **Raise any new blockers** — `POST /blockers` for anything blocking progress
+5. **Resolve cleared blockers** — `PATCH /blockers/:id` for anything unblocked this session
+6. **Push markdown backup** — commit updated project status file to `FLATPLANET-STANDARDS/projects/{slug}.md`
 
-- *"Invoice system fully operational"* — due 2026-04-30
-- *"REST API deployed and tested"* — due 2026-04-15
-- *"Admin UI live for developers"* — due 2026-05-15
+### 6.1 Session Log Markdown Format (GitHub backup)
 
-Objectives are created by Claude when a project is set up, or added by a developer via the admin UI. They are never invented mid-session without the human's knowledge — Claude proposes, the human confirms.
+Every project maintains a file at `FLATPLANET-STANDARDS/projects/{slug}.md`:
 
-### Checklist items
+```markdown
+# {Project Name} — Status Report
+**Last updated:** {date}
+**Version:** {version}
+**Status:** {status}
 
-Checklist items are the tasks that must be completed for an objective to be achieved. Claude ticks them off as work is completed. Examples under *"Invoice system fully operational"*:
+## Current Objectives
+| Objective | Progress | Due | Status |
+|---|---|---|---|
+| {title} | {x}% | {date} | {status} |
 
-- [ ] Stage 0 — DB foundation complete
-- [ ] Stage 1 — Timesheet reports complete
-- [ ] Stage 2 — Goodwill requests complete
-- [x] Stage 3 — Invoice generation complete
-- [ ] Stage 4 — Lock wiring complete
-- [ ] Stage 5 — Finance view complete
+## Open Blockers
+- {blocker description}
 
-Progress = 1/6 = 17% complete.
+## Latest Session ({number}) — {date}
+### What was done
+{summary}
 
-### Progress computation
+### Decisions made
+{decisions}
 
-- Objective % = checklist items done / total checklist items
-- Project % = average across all active objectives (excluding cancelled)
-- Both are computed on read — never stored
+### Next session
+{next_steps}
 
----
-
-## 6. Build Phases
-
-### Phase 1 — Supabase Schema `[HIGHEST PRIORITY — start here]`
-
-Build the database. Everything else depends on it. Create all tables with correct types, constraints, and row-level security. No seed data needed — projects register themselves on first session.
-
-### Phase 2 — REST API `[HIGH]`
-
-Build the Mission Control API in the FP-MISSION-CONTROL repo. Node.js/TypeScript. All endpoints from the architecture section. The session-close endpoint is the most important — get this right. Deploy to a stable Netlify function URL.
-
-### Phase 3 — CLAUDE.md Integration Pattern `[HIGH]`
-
-Write the standard CLAUDE.md block every project includes. Define the session-close payload format. Test end-to-end with the TALA project — register TALA in Mission Control, run a mock session close, confirm the data appears correctly.
-
-### Phase 4 — Dashboard `[MEDIUM]`
-
-Build the React dashboard on Netlify. Portfolio view first — get all projects visible. Then project drill-down. Planning timeline and blockers view come after.
-
-### Phase 5 — Planning & Deadlines `[MEDIUM]`
-
-Build the planning timeline view. Add deadline warning indicators to project cards (e.g. red if an objective is overdue, amber if due within 7 days). Add the ability for developers to set and update deadlines via the admin UI without needing Claude.
-
-### Phase 6 — Notifications `[LOW — future]`
-
-Slack or email notification when: a project is blocked, a deadline is missed, a project has had no session in X days. Keeps leadership informed without having to check the dashboard.
+## Session History
+| Session | Date | Summary |
+|---|---|---|
+| #{n} | {date} | {one-liner} |
+```
 
 ---
 
-## 7. Implementation Checklist
+## 7. Dashboard Design
 
-### Phase 1 — Supabase Schema
+### 7.1 Project Cards View (default)
+One card per project. Each card shows:
+- Project name + status badge
+- Business unit
+- Current version
+- Overall % complete (progress bar)
+- Nearest objective title + deadline + days remaining
+- Open blocker count (red badge if > 0)
+- Last session date
 
-- [ ] Create `projects` table with all fields per schema
-- [ ] Create `objectives` table with all fields per schema
-- [ ] Create `checklist_items` table with all fields per schema
-- [ ] Create `sessions` table with all fields per schema
-- [ ] Create `session_updates` table with all fields per schema
-- [ ] Create `blockers` table with all fields per schema
-- [ ] Index all foreign key columns
-- [ ] Index `objectives.due_at` — used in planning view ORDER BY
-- [ ] Index `blockers.status` — used in blockers view filter
-- [ ] Index `sessions.project_id` and `sessions.session_date`
-- [ ] Apply row-level security — read: public, write: authenticated service role only
-- [ ] Test all table relationships with sample data
+### 7.2 Project Drill-Down
+Click a project card to see:
+- Full objective list with progress bars and deadlines
+- Checklist items per objective (expandable)
+- Open blockers
+- Session history (most recent first)
 
-### Phase 2 — REST API
+### 7.3 Planning View (Timeline)
+All objectives across all projects, sorted by deadline. Colour coded:
+- 🟢 Green — on track (> 14 days remaining)
+- 🟡 Amber — approaching (≤ 14 days remaining)
+- 🔴 Red — overdue
+- ⬛ Grey — complete
 
-- [ ] Initialise Node.js/TypeScript project in FlatPlanet-Hub/FP-MISSION-CONTROL repo
-- [ ] Connect to Supabase using service role key
-- [ ] Build `GET /v1/projects` with computed progress fields
-- [ ] Build `GET /v1/projects/:slug` full detail endpoint
-- [ ] Build `POST /v1/projects` — register new project
-- [ ] Build `PATCH /v1/projects/:slug` — update project status and version
-- [ ] Build `POST /v1/projects/:slug/objectives` — add objective
-- [ ] Build `PATCH /v1/objectives/:id` — update objective
-- [ ] Build `POST /v1/objectives/:id/checklist` — add checklist item
-- [ ] Build `PATCH /v1/checklist/:id` — tick or untick item
-- [ ] Build `POST /v1/projects/:slug/sessions` — session-close write (atomic, handles all sub-writes)
-- [ ] Build `POST /v1/projects/:slug/blockers` — add blocker
-- [ ] Build `PATCH /v1/blockers/:id` — resolve blocker
-- [ ] Build `GET /v1/planning` — all objectives sorted by due_at
-- [ ] Add API versioning — `/v1/` prefix on all routes
-- [ ] Add rate limiting
-- [ ] Deploy to stable URL via Netlify Functions
+### 7.4 Blockers View
+All open blockers across all projects in one place. Sorted by age (oldest first).
+
+### 7.5 Design Constraints
+- Dark theme (consistent with FlatPlanet standards)
+- Mobile responsive
+- No login required (read-only dashboard is public)
+- Real-time updates via Supabase subscriptions
+
+---
+
+## 8. Build Phases
+
+### Phase 1 — Supabase Schema (START HERE)
+- [ ] Create FlatPlanet Supabase instance (if not already done for FP-DATA-DICTIONARY)
+- [ ] Create `projects` table
+- [ ] Create `objectives` table
+- [ ] Create `checklist_items` table
+- [ ] Create `sessions` table
+- [ ] Create `blockers` table
+- [ ] Enable Row Level Security
+- [ ] Create read-only public role
+- [ ] Create write role (API key gated)
+- [ ] Seed with existing FlatPlanet projects (Tala, FP-DATA-DICTIONARY, FP-MISSION-CONTROL)
+
+### Phase 2 — API
+- [ ] Create `FlatPlanet-Hub/FP-MISSION-CONTROL` repo
+- [ ] Set up Node.js / TypeScript project structure
+- [ ] Implement `/projects` endpoints
+- [ ] Implement `/objectives` endpoints
+- [ ] Implement `/checklist` endpoints
+- [ ] Implement `/sessions` endpoint
+- [ ] Implement `/blockers` endpoints
+- [ ] Implement `/dashboard` aggregation endpoint
+- [ ] Deploy to Netlify Functions
+- [ ] Add API key authentication to write endpoints
 - [ ] Write API documentation
 
-### Phase 3 — CLAUDE.md Integration
+### Phase 3 — Claude Session Protocol
+- [ ] Write CLAUDE.md session close instructions
+- [ ] Add API call block to FLATPLANET-STANDARDS CLAUDE.md
+- [ ] Test session close write on a live project (Tala first)
+- [ ] Verify GitHub markdown backup write
+- [ ] Create `/projects/` folder in FLATPLANET-STANDARDS repo
+- [ ] Add initial status files for existing projects
 
-- [ ] Write the standard CLAUDE.md Mission Control block — API URL, session-close instructions, payload format
-- [ ] Define the full session-close JSON payload format
-- [ ] Test with TALA — register TALA as first project in Mission Control
-- [ ] Run a test session close — confirm all data writes correctly
-- [ ] Update TALA's CLAUDE.md with live Mission Control API endpoint
-- [ ] Document the integration pattern for all future projects
-
-### Phase 4 — Dashboard
-
-- [ ] Scaffold React project in FP-MISSION-CONTROL repo (same repo, `/dashboard` folder)
-- [ ] Connect to Mission Control API
-- [ ] Build portfolio view — grid of project cards with status, progress, nearest deadline
-- [ ] Build project detail view — objectives, checklist, sessions, blockers
-- [ ] Build blockers view — all open blockers across all projects
+### Phase 4 — Dashboard (React)
+- [ ] Set up React project in FP-MISSION-CONTROL repo
+- [ ] Build project card grid
+- [ ] Build project drill-down view
+- [ ] Build planning / timeline view
+- [ ] Build blockers view
+- [ ] Connect to Supabase real-time subscriptions
 - [ ] Deploy to Netlify
-- [ ] Set up auto-deploy on push to main
+- [ ] Verify live dashboard updates when sessions are logged
 
-### Phase 5 — Planning & Deadlines
-
-- [ ] Build planning timeline view — all objectives plotted by deadline
-- [ ] Add deadline warning indicators — overdue (red), due within 7 days (amber)
-- [ ] Add ability to set/update deadlines without Claude via dashboard
-- [ ] Add objective completion % to project cards
-
-### Phase 6 — Notifications (future)
-
-- [ ] Define notification triggers — blocked, overdue, no session in X days
-- [ ] Integrate with Slack or email
-- [ ] Add notification preferences per project
+### Phase 5 — Rollout
+- [ ] Tala — add session close protocol
+- [ ] FP-DATA-DICTIONARY — add session close protocol
+- [ ] FP-MISSION-CONTROL — add session close protocol (self-referential)
+- [ ] Document onboarding process for new projects
+- [ ] Add to FLATPLANET-STANDARDS as a required standard
 
 ---
 
-## 8. Decisions Already Made — Do Not Re-Open
+## 9. Integration with FP-DATA-DICTIONARY
 
-| Decision | What was decided |
-|---|---|
-| Separate repo from FP Data Dictionary | Mission Control is its own service — FP Data Dictionary stays read-only |
-| Shared Supabase instance | Both services use the same dedicated FlatPlanet Supabase instance, separate schemas |
-| Claude is the only writer | No manual status entry — Claude writes at session end, humans manage objectives and deadlines via admin UI |
-| One session-close API call | Claude makes one atomic call at session end — not multiple separate writes |
-| Progress computed on read | Checklist % and project % are never stored — always computed from live data |
-| Dashboard is public within FlatPlanet | No login required to view — visibility is the goal |
-| Objectives owned by humans | Claude proposes objectives, humans confirm — Claude never invents objectives without instruction |
+FP Mission Control and FP-DATA-DICTIONARY share the same Supabase instance but are completely separate schemas. Mission Control does not depend on the Data Dictionary and vice versa. They may reference each other via project records.
 
 ---
 
-*FP Mission Control v1.0 · 2026-03-19 · FlatPlanet-Hub*
+## 10. Future Phases (not in scope for initial build)
+
+- **Notifications** — Slack/email alerts when a blocker is raised or a deadline is missed
+- **Business unit rollup** — aggregate progress by business unit (On Demand, FlatPlanet Hub, etc.)
+- **Dependency mapping** — mark when one project is blocked by another
+- **Budget tracking** — link objectives to estimated vs actual hours
+- **Client visibility** — filtered read-only view per client showing only their relevant projects
+
+---
+
+## 11. Open Questions
+
+1. Is the FlatPlanet Supabase instance already created (for FP-DATA-DICTIONARY), or does it need to be set up fresh?
+2. What is the Netlify account / team the FP-MISSION-CONTROL app should deploy under?
+3. Should the dashboard be password protected, or is public read-only acceptable for now?
+4. Priority order — is FP-MISSION-CONTROL higher priority than FP-DATA-DICTIONARY, or do they run in parallel?
+
+---
+
+*This document is the source of truth for FP Mission Control. All implementation decisions should be checked against it. Update this document as decisions are made.*

@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 2.1 | Last updated: 2026-03-19
+> Version: 2.2 | Last updated: 2026-03-19
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -59,38 +59,99 @@ To check if documentation is up to date:
 
 ## 3. Version Control
 
-Version control tracks what changed, when, and why. Claude handles Git. Everyone is responsible for knowing the current version and keeping the changelog accurate.
+Version control is not optional and it is not flexible. Every FlatPlanet project follows these rules exactly. Uniformity across all projects is the goal — the same rules apply whether the project is two weeks old or two years old.
 
-### Version Number Format: MAJOR.MINOR.PATCH
+### Version Numbers
+
+Format: `MAJOR.MINOR.PATCH`
 
 | Number | When it changes | Example |
 |--------|-----------------|---------|
-| MAJOR | Project fundamentally changed or incompatible with previous version | 1.0.0 to 2.0.0 |
-| MINOR | New feature added | 1.0.0 to 1.1.0 |
-| PATCH | Bug fixed or small update | 1.0.0 to 1.0.1 |
+| MAJOR | Fundamental change — breaks compatibility with the previous version | 1.0.0 → 2.0.0 |
+| MINOR | New feature added that does not break anything existing | 1.0.0 → 1.1.0 |
+| PATCH | Bug fix, copy change, or small update | 1.0.0 → 1.0.1 |
 
-Every project starts at version 1.0.0.
+- Every project starts at `1.0.0`
+- Version numbers only go up — never reset, never skip
+- The version in `CLAUDE.md`, `README.md`, and `CHANGELOG.md` must always match
+- Claude increments the version at the end of every session that changes the project
 
-### Git Branch Strategy
+### Branches
 
-| Branch | Purpose |
-|--------|---------|
-| main | Production -- always working, always protected |
-| dev | Integration -- features come here before main |
-| feature/short-name | One feature or one Claude session |
-| fix/short-name | Bug fixes |
-| docs/short-name | Documentation-only changes |
+Every project has exactly these branches. No others.
 
-### Commit Message Format
+| Branch | Purpose | Who pushes here |
+|--------|---------|-----------------|
+| `main` | Production — always deployable, always protected | Nobody directly. PRs from `dev` only. |
+| `dev` | Integration — all work lands here first | Claude via PRs from feature/fix/docs branches |
+| `feature/short-name` | One feature or one Claude session | Claude |
+| `fix/short-name` | Bug fixes | Claude |
+| `docs/short-name` | Documentation-only changes | Claude |
+
+Rules:
+- Nobody pushes directly to `main` — ever. Not developers, not Claude.
+- `main` only receives merges from `dev` via a pull request
+- Every PR into `main` requires at least one human review and all tests passing
+- Feature, fix, and docs branches are deleted after merging — they do not accumulate
+- Branch names are lowercase kebab-case: `feature/invoice-export`, not `feature/InvoiceExport`
+
+### Commits
+
+Every commit message follows this format exactly:
 
   type: short description (max 72 characters)
-  Types: feat | fix | docs | style | refactor | test | chore
+
+Types:
+- `feat` — new feature
+- `fix` — bug fix
+- `docs` — documentation only
+- `style` — formatting, no logic change
+- `refactor` — restructure without behaviour change
+- `test` — adding or fixing tests
+- `chore` — dependencies, config, tooling
 
 Examples:
-  feat: add monthly report export for operations dashboard
+  feat: add monthly report export to operations dashboard
   fix: resolve export button not responding on Safari
   docs: update README with new setup steps
   chore: upgrade all dependencies to latest stable
+
+Rules:
+- One logical change per commit — do not bundle unrelated changes
+- Present tense, lowercase, no full stop at the end
+- If a commit needs more than 72 characters to describe, it should probably be two commits
+
+### Pull Requests
+
+- Every change to `dev` or `main` goes through a pull request — no exceptions
+- PR title follows the same format as commit messages: `type: short description`
+- PR description must explain what changed and why in plain English
+- All tests must pass before a PR can be merged
+- PRs into `main` require at least one human approval
+- Claude writes the PR description — it must be readable by a non-developer
+
+### Releases
+
+- A release happens every time `dev` is merged into `main`
+- Every release is tagged in Git: `v1.2.0`
+- Every release has a corresponding entry in `CHANGELOG.md`
+- Tag format: `v` + version number. Always. No variations.
+
+### Hotfixes
+
+When something is broken in production and cannot wait for the normal `dev → main` flow:
+
+1. Branch from `main` directly: `fix/hotfix-short-description`
+2. Fix only the broken thing — nothing else
+3. PR directly into `main` with human review
+4. Immediately merge the same fix into `dev` so it is not overwritten
+5. Increment the PATCH version: `1.2.0 → 1.2.1`
+6. Tag the release and update `CHANGELOG.md`
+
+### Merge Strategy
+
+- `feature/*`, `fix/*`, `docs/*` → `dev`: **squash merge** — keeps `dev` history clean, one commit per feature
+- `dev` → `main`: **merge commit** — preserves the full record of what went into each release
 
 ---
 
@@ -383,6 +444,6 @@ Review schedule:
 ---
 
 Last updated: 2026-03-19
-Version: 2.1
+Version: 2.2
 Maintained by: FlatPlanet-Hub
 One standard, every project, every person.

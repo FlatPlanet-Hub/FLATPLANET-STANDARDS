@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 2.2 | Last updated: 2026-03-19
+> Version: 2.3 | Last updated: 2026-03-19
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -346,7 +346,8 @@ Every Claude Code session must follow these steps in order:
 5. Update documentation -- Every session that changes code must update CHANGELOG.md and any affected docs
 6. Write tests -- Every new function gets at least one test
 7. Commit cleanly -- Each logical change gets its own commit with a clear message
-8. Write the conversation log entry -- The final act of every session, before anything else closes
+8. Write the conversation log entry -- Update CONVERSATION-LOG.md in the project repo
+9. Push the project status report -- Update this project's file in the FLATPLANET-STANDARDS/projects/ folder and push it. This is mandatory. The session is not closed until this is done.
 
 ### Conversation Log
 
@@ -416,7 +417,72 @@ Claude must also output this to the chat at the end of every session so the huma
 
 ---
 
-## 12. Pull Request Rules
+## 12. Project Status Reports
+
+Every FlatPlanet project must push a status report to the central FLATPLANET-STANDARDS repository at the end of every session. This gives FlatPlanet-Hub a live view of all active projects in one place — what is being built, who is working on it, and where things stand right now.
+
+### Where the file lives
+
+In the FLATPLANET-STANDARDS repo, under `/projects/`. One file per project, named after the project in kebab-case:
+
+  FLATPLANET-STANDARDS/
+    projects/
+      tala.md
+      fp-data-dictionary.md
+      [project-name].md
+
+The file is overwritten on every session close — it always reflects the current state, not a history. History lives in the project's own CONVERSATION-LOG.md.
+
+### How to push the report
+
+At the end of every session, Claude must:
+1. Clone or pull the FLATPLANET-STANDARDS repo
+2. Write or overwrite `/projects/[project-name].md` with the current status report
+3. Commit with message: `chore: update [project-name] status [YYYY-MM-DD]`
+4. Push to `main`
+
+This happens after all project commits are done — it is the last action before the session closes.
+
+### Project Status Report Template
+
+  # [Project Name] — Status Report
+  **Last updated:** [YYYY-MM-DD]
+  **Session:** [number]
+  **Version:** [X.X.X]
+  **Status:** [Active | Paused | Blocked | Complete]
+  **Repo:** [GitHub URL]
+  **Owner:** [Role title or team — never personal names]
+
+  ---
+
+  ## What This Project Is
+  [2-3 sentences. Plain English. What it does and why it exists.]
+
+  ## Current State
+  [What is working right now. What a new person would find if they opened the project today.]
+
+  ## What Was Done This Session
+  - [Bullet points — plain English, meaningful level of detail]
+
+  ## What Is Next
+  1. [Most important next task — specific enough to act on]
+  2. [Second task]
+  3. [Third task]
+
+  ## Open Issues
+  | ID | Priority | Description |
+  |----|----------|-------------|
+  | [ID] | High / Medium / Low | [Plain English description] |
+
+  ## Blockers
+  [Anything stopping progress. None if clear.]
+
+  ## Key Decisions on Record
+  - [Decision]: [Why it was made — brief]
+
+---
+
+## 13. Pull Request Rules
 
 - Every PR must have a plain English description of what changed and why
 - Every PR must pass all tests before merging
@@ -444,6 +510,6 @@ Review schedule:
 ---
 
 Last updated: 2026-03-19
-Version: 2.2
+Version: 2.3
 Maintained by: FlatPlanet-Hub
 One standard, every project, every person.

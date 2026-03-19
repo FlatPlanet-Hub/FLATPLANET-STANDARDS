@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 2.0 | Last updated: 2026-03-19
+> Version: 2.1 | Last updated: 2026-03-19
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -102,6 +102,7 @@ Every FlatPlanet project must always have these files maintained and up to date:
 |------|-----------------|----------------|
 | README.md | What the project does, how to use it, current status | Claude |
 | CHANGELOG.md | Full version history of every change | Claude |
+| CONVERSATION-LOG.md | Claude's session-by-session memory — current state, decisions, next steps | Claude (end of every session) |
 | CLAUDE.md | Technical brief for Claude Code | Developer or Claude |
 | docs/api.md | API endpoint documentation | Claude (auto on API changes) |
 | .env.example | All required environment variables listed | Developer |
@@ -166,6 +167,7 @@ Every FlatPlanet project must follow this structure:
     CLAUDE.md              - Claude reads this first (required)
     README.md              - Plain English project overview (required)
     CHANGELOG.md           - Full version history (required)
+    CONVERSATION-LOG.md    - Claude's memory across sessions (required)
     src/                   - All source code, organized by domain
     tests/                 - Mirrors src/ structure
     docs/
@@ -276,17 +278,59 @@ All variable names must come from the FlatPlanet Data Dictionary where applicabl
 
 Every Claude Code session must follow these steps in order:
 
-1. Read standards first -- Fetch STANDARDS.md and DATA_DICTIONARY.md before writing any code
-2. Confirm the task -- Restate the task in plain English before starting so anyone can verify Claude understood correctly
-3. Follow the Data Dictionary -- All variable names must match the dictionary where applicable
-4. Update documentation -- Every session that changes code must update CHANGELOG.md and any affected docs
-5. Write tests -- Every new function gets at least one test
-6. Commit cleanly -- Each logical change gets its own commit with a clear message
-7. End with a summary -- Every session ends with a plain English summary of what was done
+1. Read the conversation log first -- Open CONVERSATION-LOG.md and read the most recent entry before doing anything else. This is how Claude recovers context from the previous session.
+2. Read standards -- Fetch STANDARDS.md and DATA_DICTIONARY.md before writing any code
+3. Confirm the task -- Restate the task in plain English before starting so anyone can verify Claude understood correctly
+4. Follow the Data Dictionary -- All variable names must match the dictionary where applicable
+5. Update documentation -- Every session that changes code must update CHANGELOG.md and any affected docs
+6. Write tests -- Every new function gets at least one test
+7. Commit cleanly -- Each logical change gets its own commit with a clear message
+8. Write the conversation log entry -- The final act of every session, before anything else closes
+
+### Conversation Log
+
+Every FlatPlanet project must have a `CONVERSATION-LOG.md` at the repo root. This is Claude's memory across sessions. It is the single most important file for maintaining continuity on a project. Without it, every session starts cold and context is lost.
+
+**Purpose:** The conversation log exists so that when a new Claude session opens, it can read the most recent entry and immediately understand the current state of the project — what has been built, what decisions were made and why, what is broken, what is next, and any context that would otherwise be lost.
+
+**Rules:**
+- One entry per session, appended to the top of the file (newest first)
+- Never edit or delete previous entries
+- Written by Claude at the end of every session, before committing
+- Must be committed and pushed with every session close
+- The human must not close a session without confirming the log has been written
+
+### CONVERSATION-LOG.md Entry Template
+
+  ---
+  ## Session [number] — [YYYY-MM-DD]
+  **Version at close:** [X.X.X]
+  **Worked on by:** [Claude model or human name if relevant]
+
+  ### What we did this session
+  - [Plain English. Not just what changed — include why decisions were made.]
+  - [If something was tried and abandoned, record that too and why.]
+
+  ### Current state of the project
+  [2-5 sentences. Describe where the project stands right now as if explaining to someone seeing it for the first time. What works, what is in progress, what is missing.]
+
+  ### Decisions made
+  - [Decision]: [Why it was made. Include alternatives that were rejected if relevant.]
+
+  ### Open issues / known problems
+  - [Anything broken, incomplete, or deferred. Be honest — this is Claude's own notes.]
+
+  ### What to do next session
+  1. [First thing to pick up — be specific enough that Claude can start without asking]
+  2. [Second thing, etc.]
+
+  ### Context that would otherwise be lost
+  - [Anything that is not obvious from reading the code. Gotchas, constraints, things that were hard-won.]
+  ---
 
 ### Session Summary Template
 
-Claude must output this at the end of every session:
+Claude must also output this to the chat at the end of every session so the human can confirm before closing:
 
   ## Session Summary
 
@@ -303,6 +347,7 @@ Claude must output this at the end of every session:
   Documentation updated:
   - CHANGELOG.md: yes / no
   - README.md: yes / no
+  - CONVERSATION-LOG.md: yes (required)
   - docs/api.md: yes / no / not applicable
 
   Next steps:
@@ -338,6 +383,6 @@ Review schedule:
 ---
 
 Last updated: 2026-03-19
-Version: 2.0
+Version: 2.1
 Maintained by: FlatPlanet-Hub
 One standard, every project, every person.

@@ -1,0 +1,73 @@
+name: Sync STANDARDS.md to all org project repos
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'FLATPLANET-STANDARDS/STANDARDS.md'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout standards repo
+        uses: actions/checkout@v4
+
+      - name: Sync STANDARDS.md to every project repo
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          ORG: FlatPlanet-Hub
+        run: |
+          STANDARDS_B64=$(python3 -c "
+          import base64
+          with open('FLATPLANET-STANDARDS/STANDARDS.md', 'rb') as f:
+              print(base64.b64encode(f.read()).decode())
+          ")
+
+          SKIP="FLATPLANET-STANDARDS fp-development-hub"
+
+          REPOS=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/$ORG/repos?per_page=100&type=all" \
+            | python3 -c "import sys,json; [print(r['name']) for r in json.load(sys.stdin)]")
+
+          UPDATED=0; SKIPPED=0; MISSING=0
+
+          for REPO in $REPOS; do
+            if echo "$SKIP" | grep -qw "$REPO"; then
+              echo "Skipping $REPO"
+              SKIPPED=$((SKIPPED+1))
+              continue
+            fi
+
+            FILE_RESP=$(curl -s -o /tmp/file_resp.json -w "%{http_code}" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$ORG/$REPO/contents/STANDARDS.md")
+
+            if [ "$FILE_RESP" != "200" ]; then
+              echo "STANDARDS.md not found in $REPO — skipping"
+              MISSING=$((MISSING+1))
+              continue
+            fi
+
+            SHA=$(python3 -c "import json; print(json.load(open('/tmp/file_resp.json'))['sha'])")
+
+            HTTP=$(curl -s -o /tmp/put_resp.json -w "%{http_code}" \
+              -X PUT \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$ORG/$REPO/contents/STANDARDS.md" \
+              -d "{\"message\":\"chore: sync STANDARDS.md from FlatPlanet standards\",\"content\":\"$STANDARDS_B64\",\"sha\":\"$SHA\"}")
+
+            if [ "$HTTP" = "200" ] || [ "$HTTP" = "201" ]; then
+              echo "Updated $REPO"
+              UPDATED=$((UPDATED+1))
+            else
+              MSG=$(python3 -c "import json; d=json.load(open('/tmp/put_resp.json')); print(d.get('message','unknown error'))" 2>/dev/null || echo "unknown")
+              echo "Failed to update $REPO: $MSG"
+            fi
+          done
+
+          echo ""
+          echo "Done — updated: $UPDATED | skipped: $SKIPPED | not found: $MISSING"

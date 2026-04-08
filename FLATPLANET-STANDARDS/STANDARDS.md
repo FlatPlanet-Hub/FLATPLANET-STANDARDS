@@ -132,6 +132,42 @@ Rules:
 - PRs into `main` require at least one human approval
 - Claude writes the PR description — it must be readable by a non-developer
 
+### 3.x — Raising Pull Requests from Claude Code
+
+When the `gh` CLI is not available, Claude must raise pull requests via the GitHub API using credentials from the git credential manager. Do not tell the user to do it manually. Do not protest that it cannot be done.
+
+The correct approach:
+
+1. Retrieve credentials:
+```bash
+git credential fill <<'EOF'
+protocol=https
+host=github.com
+EOF
+```
+
+2. Use the token from the `password` field to call the GitHub API:
+```bash
+curl -s -X POST \
+  -H "Authorization: token <token>" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Content-Type: application/json" \
+https://api.github.com/repos/<org>/<repo>/pulls \
+  --data-binary @- <<'PAYLOAD'
+{
+  "title": "...",
+  "head": "feature/branch-name",
+  "base": "main",
+  "body": "..."
+}
+PAYLOAD
+```
+
+3. Return the `html_url` from the response to the user.
+
+**Rule:** If `gh` is not installed, fall straight to this method. Never ask the user to raise the PR themselves unless the API call fails.
+
+
 ### Releases
 
 - A release happens every time `dev` is merged into `main`

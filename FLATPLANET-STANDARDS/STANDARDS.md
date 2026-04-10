@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 2.6 | Last updated: 2026-04-06
+> Version: 2.7 | Last updated: 2026-04-10
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -562,6 +562,9 @@ All projects created on the FlatPlanet platform follow enforced tech stack stand
 - Always include `created_at TIMESTAMPTZ DEFAULT now()`
 - Soft deletes preferred — use `is_active` boolean over hard deletes
 - Always add indexes on foreign keys and frequently queried columns
+- SQL `@param` names must be snake_case matching the column name exactly — camelCase params (e.g. `@businessId`) silently fail to bind in Dapper, leaving those columns NULL. Single-word params like `@name` appear to work by coincidence, making the bug hard to spot
+- UUID parameters require an explicit `::uuid` cast in SQL — e.g. `WHERE id = @id::uuid`. Without it, binding silently fails against UUID columns
+- JSONB columns return as raw strings through the Platform API (Dapper behaviour) — any DTO property mapping to a JSONB column must use a converter to unwrap the string before treating it as an object
 
 ### Authentication
 When a project has authentication enabled, it must use the FlatPlanet Security Platform (SP) — projects must NOT build their own auth system.
@@ -590,7 +593,7 @@ Review schedule:
 
 ---
 
-Last updated: 2026-04-06
-Version: 2.6
+Last updated: 2026-04-10
+Version: 2.7
 Maintained by: FlatPlanet-Hub
 One standard, every project, every person.

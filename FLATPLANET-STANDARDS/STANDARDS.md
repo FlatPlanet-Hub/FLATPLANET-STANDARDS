@@ -541,6 +541,7 @@ All projects created on the FlatPlanet platform follow enforced tech stack stand
 - API calls: always through a service layer — never fetch directly in components
 - Error boundaries: wrap major sections
 - No unused imports, no `console.log` in production code
+- Always remove unused variables
 
 ### Backend Standards (.NET 10 / C#)
 - .NET 10 / C# — use latest language features (primary constructors, pattern matching, etc.)

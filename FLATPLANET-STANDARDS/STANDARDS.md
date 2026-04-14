@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 2.7 | Last updated: 2026-04-10
+> Version: 2.8 | Last updated: 2026-04-14
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -541,7 +541,6 @@ All projects created on the FlatPlanet platform follow enforced tech stack stand
 - API calls: always through a service layer — never fetch directly in components
 - Error boundaries: wrap major sections
 - No unused imports, no `console.log` in production code
-- Always remove unused variables
 
 ### Backend Standards (.NET 10 / C#)
 - .NET 10 / C# — use latest language features (primary constructors, pattern matching, etc.)
@@ -594,7 +593,76 @@ Review schedule:
 
 ---
 
-Last updated: 2026-04-10
-Version: 2.7
+## 16. File Versioning — STANDARDS.md, CLAUDE.md, and CLAUDE-local.md
+
+Three files govern every FlatPlanet project session. Each is versioned so Claude can detect when it is working with outdated context and take action.
+
+### The Three Files
+
+| File | Version location | Who updates it | Update trigger |
+|---|---|---|---|
+| `STANDARDS.md` | Header: `> Version: X.X` | FlatPlanet team | When platform-wide rules change |
+| `CLAUDE.md` | Header: `<!-- CLAUDE_MD_VERSION: X.X -->` | HubApi (auto-pushed on project update) | When the project template changes |
+| `CLAUDE-local.md` | Header: `<!-- CLAUDE_LOCAL_VERSION: X.X -->` | HubApi (generated on demand) | When the local template changes |
+
+### Current Versions
+
+| File | Current Version |
+|---|---|
+| `STANDARDS.md` | 2.8 |
+| `CLAUDE.md` | 1.1 |
+| `CLAUDE-local.md` | 1.1 |
+
+### What Claude Must Do at Session Start
+
+**1. Check STANDARDS.md version**
+
+Fetch the raw file and read the version from the header:
+```
+https://raw.githubusercontent.com/FlatPlanet-Hub/FLATPLANET-STANDARDS/main/FLATPLANET-STANDARDS/STANDARDS.md
+```
+If the version is higher than the one you last read, read the full updated file before writing any code.
+
+**2. Check CLAUDE.md version**
+
+At the start of every session, check if CLAUDE.md has been updated on the remote:
+```bash
+git fetch origin
+git diff HEAD origin/main -- CLAUDE.md
+```
+If there are changes, pull them before starting work:
+```bash
+git pull origin main
+```
+CLAUDE.md is committed to the repo. It is the shared project brief for all team members. Always work from the latest version.
+
+**3. Check CLAUDE-local.md version**
+
+Read the `<!-- CLAUDE_LOCAL_VERSION: X.X -->` comment at the top of CLAUDE-local.md.
+Compare it against the current version in the table above.
+
+If your local version is older, tell the user:
+```
+⚠️ Your CLAUDE-local.md is outdated (you have vX.X, current is vX.X).
+Please regenerate it from the FlatPlanet Hub to get the latest template and a fresh token.
+
+To regenerate:
+POST {hubApiBaseUrl}/api/projects/{projectId}/claude-config/regenerate
+Header: Authorization: Bearer <your SP JWT>
+
+Or use the FlatPlanet Hub frontend → your project → "Get Workspace File".
+```
+
+Do not proceed with the outdated file if the version gap is more than one minor version.
+
+### How Versions Are Incremented
+
+- **STANDARDS.md**: Incremented manually by the FlatPlanet team when rules change. Minor version for additions, major version for breaking changes.
+- **CLAUDE.md / CLAUDE-local.md**: Incremented in `ClaudeConfigService.cs` (`LocalFileVersion` constant). Increment when the template adds, removes, or changes instructions in a meaningful way. A version bump triggers a re-push of CLAUDE.md to all project repos on next project update.
+
+---
+
+Last updated: 2026-04-14
+Version: 2.8
 Maintained by: FlatPlanet-Hub
 One standard, every project, every person.

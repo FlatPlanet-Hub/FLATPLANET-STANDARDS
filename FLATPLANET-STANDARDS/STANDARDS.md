@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 2.7 | Last updated: 2026-04-15
+> Version: 2.9 | Last updated: 2026-04-15
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -131,6 +131,42 @@ Rules:
 - All tests must pass before a PR can be merged
 - PRs into `main` require at least one human approval
 - Claude writes the PR description — it must be readable by a non-developer
+
+### 3.x — Raising Pull Requests from Claude Code
+
+When the `gh` CLI is not available, Claude must raise pull requests via the GitHub API using credentials from the git credential manager. Do not tell the user to do it manually. Do not protest that it cannot be done.
+
+The correct approach:
+
+1. Retrieve credentials:
+```bash
+git credential fill <<'EOF'
+protocol=https
+host=github.com
+EOF
+```
+
+2. Use the token from the `password` field to call the GitHub API:
+```bash
+curl -s -X POST \
+  -H "Authorization: token <token>" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Content-Type: application/json" \
+https://api.github.com/repos/<org>/<repo>/pulls \
+  --data-binary @- <<'PAYLOAD'
+{
+  "title": "...",
+  "head": "feature/branch-name",
+  "base": "main",
+  "body": "..."
+}
+PAYLOAD
+```
+
+3. Return the `html_url` from the response to the user.
+
+**Rule:** If `gh` is not installed, fall straight to this method. Never ask the user to raise the PR themselves unless the API call fails.
+
 
 ### Releases
 
@@ -526,6 +562,9 @@ All projects created on the FlatPlanet platform follow enforced tech stack stand
 - Always include `created_at TIMESTAMPTZ DEFAULT now()`
 - Soft deletes preferred — use `is_active` boolean over hard deletes
 - Always add indexes on foreign keys and frequently queried columns
+- SQL `@param` names must be snake_case matching the column name exactly — camelCase params (e.g. `@businessId`) silently fail to bind in Dapper, leaving those columns NULL. Single-word params like `@name` appear to work by coincidence, making the bug hard to spot
+- UUID parameters require an explicit `::uuid` cast in SQL — e.g. `WHERE id = @id::uuid`. Without it, binding silently fails against UUID columns
+- JSONB columns return as raw strings through the Platform API (Dapper behaviour) — any DTO property mapping to a JSONB column must use a converter to unwrap the string before treating it as an object
 
 ### Authentication
 When a project has authentication enabled, it must use the FlatPlanet Security Platform (SP) — projects must NOT build their own auth system.
@@ -536,20 +575,21 @@ JWT issuer: `flatplanet-security` | JWT audience: `flatplanet-apps`
 All inter-service (backend-to-backend) calls must use SP service tokens.
 
 ### File Storage
-Projects must NOT build their own file upload endpoints or connect to Azure Blob Storage directly. All file storage goes through the FlatPlanet Platform API — this is mandatory.
 
-Platform API base URL: `https://flatplanet-api-freffxekdvb6hybs.southeastasia-01.azurewebsites.net`
+All projects that need to store files **must use the FlatPlanet Platform API storage endpoints** — teams must NOT build their own upload infrastructure (no direct Azure SDK calls, no Supabase Storage, no S3).
 
-| Operation | Endpoint |
-|---|---|
-| Upload | `POST /api/v1/storage/upload` (multipart/form-data — fields: `file`, `businessCode`, `category`, `tags`) |
-| List | `GET /api/v1/storage/files?businessCode=fp&category=your-category` |
-| Get URL | `GET /api/v1/storage/files/{fileId}/url` |
-| Delete | `DELETE /api/v1/storage/files/{fileId}` |
+**Why:** The Platform API enforces two-tier isolation (app-scoped vs unscoped), safe soft-delete ordering, Managed Identity SAS URL generation, and per-user ownership checks. Building your own upload bypasses all of these controls.
 
-**All requests require:** `Authorization: Bearer <project API token from CLAUDE-local.md>`
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/v1/storage/upload` | `POST` | Upload a file (multipart, 50 MB max) |
+| `/api/v1/storage/files` | `GET` | List files (filter by category, tags) |
+| `/api/v1/storage/files/{fileId}/url` | `GET` | Get a fresh SAS URL (60-min lifetime) |
+| `/api/v1/storage/files/{fileId}` | `DELETE` | Soft-delete a file |
 
-Files are automatically scoped to your project — your app can only see its own files. SAS URLs are time-limited (60 min) — always fetch a fresh URL before displaying, never hardcode or cache blob URLs.
+Files are **automatically scoped to your app** via the `app_id` claim in your project API token — you do not need to pass any tenant or project identifier. All members of a project team share access to the same app-scoped files.
+
+Use `businessCode` (e.g. `"fp"`) and `category` (e.g. `"documents"`, `"images"`) to organise uploads. Do not invent your own storage solution.
 
 ---
 
@@ -568,36 +608,97 @@ Review schedule:
 - Quarterly: full review by all team leads
 - As needed: any team member can raise an update at any time
 
-### How Teams Are Notified of Updates
+---
 
-There are two versioned files teams must stay current on. Both are checked automatically at every Claude session start.
+## 16. File Versioning — STANDARDS.md, CLAUDE.md, and CLAUDE-local.md
 
-**STANDARDS.md** (this file)
-- Version number is at the top: `Version: 2.7`
-- Claude fetches this file from GitHub at the start of every session (Step 2 in CLAUDE-local.md)
-- If the version has changed since the last session, Claude must **tell the user** before doing anything else:
-  > ⚠️ FlatPlanet Standards have been updated (now v2.7). Read the changelog at the bottom of STANDARDS.md before we proceed.
-- The last entry in the CHANGELOG section below summarises what changed
+Three files govern every FlatPlanet project session. Each is versioned so Claude can detect when it is working with outdated context and take action.
 
-**CLAUDE-local.md** (project workspace file)
-- Version is embedded in the file: `<!-- CLAUDE_LOCAL_VERSION: 1.3 -->`
-- Claude checks this at Step 0 of every session
-- If the version is behind the latest, Claude tells the user:
-  > ⚠️ Your CLAUDE-local.md is outdated (you have v1.2, latest is v1.3). Please regenerate it from the FlatPlanet Hub before we proceed: `POST /api/projects/{id}/claude-config/regenerate`
-- User regenerates → gets new file with updated instructions and a fresh API token
+### The Three Files
 
-**Summary: users are always notified at session start. They never need to check manually.**
+| File | Version location | Who updates it | Update trigger |
+|---|---|---|---|
+| `STANDARDS.md` | Header: `> Version: X.X` | FlatPlanet team | When platform-wide rules change |
+| `CLAUDE.md` | Header: `<!-- CLAUDE_MD_VERSION: X.X -->` | HubApi (auto-pushed on project update) | When the project template changes |
+| `CLAUDE-local.md` | Header: `<!-- CLAUDE_LOCAL_VERSION: X.X -->` | HubApi (generated on demand) | When the local template changes |
 
-### STANDARDS.md Version Changelog
+### Current Versions
 
-| Version | Date | What changed |
-|---|---|---|
-| 2.7 | 2026-04-15 | Added File Storage rule — all projects must use Platform API storage, not build their own. Added explicit user-notification rules for STANDARDS.md and CLAUDE-local.md version changes. |
-| 2.6 | 2026-04-06 | Added Dapper snake_case + ::uuid cast rules, retired DATA_DICTIONARY.md, updated DB proxy instructions |
+| File | Current Version |
+|---|---|
+| `STANDARDS.md` | 2.9 |
+| `CLAUDE.md` | 1.1 |
+| `CLAUDE-local.md` | 1.3 |
+
+### What Claude Must Do — Version Checks Are Mandatory
+
+**Checking STANDARDS.md and CLAUDE-local.md versions is not optional. Claude must check both at every session start, AND regularly throughout long sessions (e.g., whenever switching tasks or after a significant break in the conversation). If either is outdated, Claude must notify the user before doing any other work.**
+
+**1. Check STANDARDS.md version (every session start + regularly)**
+
+Fetch the raw file and read the version from the header:
+```
+https://raw.githubusercontent.com/FlatPlanet-Hub/FLATPLANET-STANDARDS/main/FLATPLANET-STANDARDS/STANDARDS.md
+```
+Compare against the current version in the table above. If the version has changed (even mid-session), tell the user **immediately**:
+```
+⚠️ FlatPlanet Standards have been updated (now vX.X, you had vX.X).
+Read the changelog at the bottom of STANDARDS.md before we proceed.
+```
+Read the full updated file before writing any code.
+
+**2. Check CLAUDE.md version**
+
+At the start of every session, check if CLAUDE.md has been updated on the remote:
+```bash
+git fetch origin
+git diff HEAD origin/main -- CLAUDE.md
+```
+If there are changes, pull them before starting work:
+```bash
+git pull origin main
+```
+CLAUDE.md is committed to the repo. It is the shared project brief for all team members. Always work from the latest version.
+
+**3. Check CLAUDE-local.md version (every session start + regularly)**
+
+Read the `<!-- CLAUDE_LOCAL_VERSION: X.X -->` comment at the top of CLAUDE-local.md.
+Compare it against the current version in the table above.
+
+If your local version is older, tell the user **immediately**:
+```
+⚠️ Your CLAUDE-local.md is outdated (you have vX.X, current is vX.X).
+Please regenerate it from the FlatPlanet Hub to get the latest template and a fresh token.
+
+To regenerate:
+POST {hubApiBaseUrl}/api/projects/{projectId}/claude-config/regenerate
+Header: Authorization: Bearer <your SP JWT>
+
+Or use the FlatPlanet Hub frontend → your project → "Get Workspace File".
+```
+
+Do not proceed with the outdated file if the version gap is more than one minor version.
+
+> **Why regular checks matter:** STANDARDS.md and CLAUDE-local.md can be updated at any point during the day — not just between sessions. A team lead may push a critical rule change mid-afternoon while your session is still running. Claude must re-check whenever it starts a new task block, not only at session start. If a version bump is detected mid-session, stop, notify the user, and pull the latest content before continuing.
+
+### How Versions Are Incremented
+
+- **STANDARDS.md**: Incremented manually by the FlatPlanet team when rules change. Minor version for additions, major version for breaking changes.
+- **CLAUDE.md / CLAUDE-local.md**: Incremented in `ClaudeConfigService.cs` (`LocalFileVersion` constant). Increment when the template adds, removes, or changes instructions in a meaningful way. A version bump triggers a re-push of CLAUDE.md to all project repos on next project update.
 
 ---
 
-Last updated: 2026-04-06
-Version: 2.6
+## STANDARDS.md Version Changelog
+
+| Version | Date | What changed |
+|---|---|---|
+| 2.9 | 2026-04-15 | Added File Storage rule — all projects must use Platform API storage, not build their own. Strengthened version check mandate: Claude must check STANDARDS.md and CLAUDE-local.md regularly (not just at session start). Explicit mid-session notification rule added. Updated CLAUDE-local.md current version to 1.3. |
+| 2.8 | 2026-04-14 | Added Section 16 — full file versioning specification for STANDARDS.md, CLAUDE.md, and CLAUDE-local.md. Defined how versions are incremented and what Claude must do at session start. |
+| 2.6 | 2026-04-06 | Added Dapper snake_case + ::uuid cast rules, retired DATA_DICTIONARY.md, updated DB proxy instructions. |
+
+---
+
+Last updated: 2026-04-15
+Version: 2.9
 Maintained by: FlatPlanet-Hub
 One standard, every project, every person.

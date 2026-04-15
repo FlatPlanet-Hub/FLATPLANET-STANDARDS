@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 3.0 | Last updated: 2026-04-15
+> Version: 3.1 | Last updated: 2026-04-15
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -550,6 +550,7 @@ All projects created on the FlatPlanet platform follow enforced tech stack stand
 - Apply design patterns where appropriate: Strategy, Chain of Responsibility, Factory, Decorator
 - No EF Core — Dapper only, raw SQL via `IDbConnectionFactory`
 - All `async`/`await` — no blocking calls (`.Result`, `.Wait()`)
+- Platform API JSON responses use **camelCase** field names (standard .NET serialization). When deserializing with `System.Text.Json`, always configure `JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }`. Never assume snake_case — that was the source of a production bug where all deserialized fields silently returned null.
 - Always run `dotnet build` before committing
 
 ### Database Standards (Supabase / PostgreSQL)
@@ -704,6 +705,7 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 
 | Version | Date | What changed |
 |---|---|---|
+| 3.1 | 2026-04-15 | Added rule: Platform API responses are camelCase — always use `JsonNamingPolicy.CamelCase` when deserializing. Documents a real production bug where snake_case assumption caused all fields to silently return null. CLAUDE-local.md template bumped to v1.6. |
 | 3.0 | 2026-04-15 | Added JWT business_ids claim documentation alongside business_codes. Added array parameter rule for Platform API query endpoint. Updated File Storage "Why" to reflect Supabase Storage per-project bucket isolation (replacing Azure Managed Identity SAS description). CLAUDE-local.md template bumped to v1.5 with business_ids guidance. |
 | 2.9 | 2026-04-15 | Added File Storage rule — all projects must use Platform API storage, not build their own. Strengthened version check mandate: Claude must check STANDARDS.md and CLAUDE-local.md regularly (not just at session start). Explicit mid-session notification rule added. Updated CLAUDE-local.md current version to 1.3. |
 | 2.8 | 2026-04-14 | Added Section 16 — full file versioning specification for STANDARDS.md, CLAUDE.md, and CLAUDE-local.md. Defined how versions are incremented and what Claude must do at session start. |

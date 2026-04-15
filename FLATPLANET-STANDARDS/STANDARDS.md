@@ -640,7 +640,7 @@ Three files govern every FlatPlanet project session. Each is versioned so Claude
 |---|---|
 | `STANDARDS.md` | 3.0 |
 | `CLAUDE.md` | 1.1 |
-| `CLAUDE-local.md` | 1.4 |
+| `CLAUDE-local.md` | 1.5 |
 
 ### What Claude Must Do — Version Checks Are Mandatory
 
@@ -704,7 +704,7 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 
 | Version | Date | What changed |
 |---|---|---|
-| 3.0 | 2026-04-15 | Added JWT business_ids claim documentation alongside business_codes. Added array parameter rule for Platform API query endpoint. Updated File Storage "Why" to reflect Supabase Storage per-project bucket isolation (replacing Azure Managed Identity SAS description). CLAUDE-local.md template updated to v1.4 with business_ids guidance. |
+| 3.0 | 2026-04-15 | Added JWT business_ids claim documentation alongside business_codes. Added array parameter rule for Platform API query endpoint. Updated File Storage "Why" to reflect Supabase Storage per-project bucket isolation (replacing Azure Managed Identity SAS description). CLAUDE-local.md template bumped to v1.5 with business_ids guidance. |
 | 2.9 | 2026-04-15 | Added File Storage rule — all projects must use Platform API storage, not build their own. Strengthened version check mandate: Claude must check STANDARDS.md and CLAUDE-local.md regularly (not just at session start). Explicit mid-session notification rule added. Updated CLAUDE-local.md current version to 1.3. |
 | 2.8 | 2026-04-14 | Added Section 16 — full file versioning specification for STANDARDS.md, CLAUDE.md, and CLAUDE-local.md. Defined how versions are incremented and what Claude must do at session start. |
 | 2.6 | 2026-04-06 | Added Dapper snake_case + ::uuid cast rules, retired DATA_DICTIONARY.md, updated DB proxy instructions. |

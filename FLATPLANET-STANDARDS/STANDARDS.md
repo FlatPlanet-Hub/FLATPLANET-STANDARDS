@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 3.1 | Last updated: 2026-04-15
+> Version: 3.2 | Last updated: 2026-04-15
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -705,6 +705,7 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 
 | Version | Date | What changed |
 |---|---|---|
+| 3.2 | 2026-04-15 | Gap analysis fixes — CLAUDE-local.md template bumped to v1.7: Delete returns 200 not 204, businessCode marked required on List, response envelope shape documented, JWT normalization pattern added (single-membership = plain string not array). |
 | 3.1 | 2026-04-15 | Added rule: Platform API responses are camelCase — always use `JsonNamingPolicy.CamelCase` when deserializing. Documents a real production bug where snake_case assumption caused all fields to silently return null. CLAUDE-local.md template bumped to v1.6. |
 | 3.0 | 2026-04-15 | Added JWT business_ids claim documentation alongside business_codes. Added array parameter rule for Platform API query endpoint. Updated File Storage "Why" to reflect Supabase Storage per-project bucket isolation (replacing Azure Managed Identity SAS description). CLAUDE-local.md template bumped to v1.5 with business_ids guidance. |
 | 2.9 | 2026-04-15 | Added File Storage rule — all projects must use Platform API storage, not build their own. Strengthened version check mandate: Claude must check STANDARDS.md and CLAUDE-local.md regularly (not just at session start). Explicit mid-session notification rule added. Updated CLAUDE-local.md current version to 1.3. |

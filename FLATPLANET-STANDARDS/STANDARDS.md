@@ -628,7 +628,7 @@ Three files govern every FlatPlanet project session. Each is versioned so Claude
 |---|---|
 | `STANDARDS.md` | 2.9 |
 | `CLAUDE.md` | 1.1 |
-| `CLAUDE-local.md` | 1.3 |
+| `CLAUDE-local.md` | 1.4 |
 
 ### What Claude Must Do — Version Checks Are Mandatory
 

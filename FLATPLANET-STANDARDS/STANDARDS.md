@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 2.9 | Last updated: 2026-04-15
+> Version: 3.0 | Last updated: 2026-04-15
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -565,6 +565,7 @@ All projects created on the FlatPlanet platform follow enforced tech stack stand
 - SQL `@param` names must be snake_case matching the column name exactly — camelCase params (e.g. `@businessId`) silently fail to bind in Dapper, leaving those columns NULL. Single-word params like `@name` appear to work by coincidence, making the bug hard to spot
 - UUID parameters require an explicit `::uuid` cast in SQL — e.g. `WHERE id = @id::uuid`. Without it, binding silently fails against UUID columns
 - JSONB columns return as raw strings through the Platform API (Dapper behaviour) — any DTO property mapping to a JSONB column must use a converter to unwrap the string before treating it as an object
+- Array parameters sent to the Platform API query endpoint must be JSON arrays in the `parameters` object — e.g. `{ "ids": ["a", "b"] }`. The Platform API unwraps JSON arrays automatically; do NOT serialize them to a string first
 
 ### Authentication
 When a project has authentication enabled, it must use the FlatPlanet Security Platform (SP) — projects must NOT build their own auth system.
@@ -574,11 +575,22 @@ JWT issuer: `flatplanet-security` | JWT audience: `flatplanet-apps`
 
 All inter-service (backend-to-backend) calls must use SP service tokens.
 
+**JWT Business Membership Claims**
+
+The SP JWT contains two parallel claims for business membership:
+
+| Claim | Type | Example | Use for |
+|---|---|---|---|
+| `business_codes` | `string[]` | `["fp"]` | Display, filtering, feature flags |
+| `business_ids` | `string[]` | `["3fa85f64-5717-4562-b3fc-2c963f66afa6"]` | Database foreign keys |
+
+Both arrays are ordered identically — index `n` in `business_codes` matches index `n` in `business_ids`. Never hardcode either value; always read from the decoded JWT.
+
 ### File Storage
 
 All projects that need to store files **must use the FlatPlanet Platform API storage endpoints** — teams must NOT build their own upload infrastructure (no direct Azure SDK calls, no Supabase Storage, no S3).
 
-**Why:** The Platform API enforces two-tier isolation (app-scoped vs unscoped), safe soft-delete ordering, Managed Identity SAS URL generation, and per-user ownership checks. Building your own upload bypasses all of these controls.
+**Why:** The Platform API enforces per-project bucket isolation (one Supabase Storage bucket per project), safe soft-delete ordering, signed URL generation, and per-user ownership checks. Building your own upload bypasses all of these controls.
 
 | Endpoint | Method | Description |
 |---|---|---|
@@ -626,7 +638,7 @@ Three files govern every FlatPlanet project session. Each is versioned so Claude
 
 | File | Current Version |
 |---|---|
-| `STANDARDS.md` | 2.9 |
+| `STANDARDS.md` | 3.0 |
 | `CLAUDE.md` | 1.1 |
 | `CLAUDE-local.md` | 1.4 |
 
@@ -692,6 +704,7 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 
 | Version | Date | What changed |
 |---|---|---|
+| 3.0 | 2026-04-15 | Added JWT business_ids claim documentation alongside business_codes. Added array parameter rule for Platform API query endpoint. Updated File Storage "Why" to reflect Supabase Storage per-project bucket isolation (replacing Azure Managed Identity SAS description). CLAUDE-local.md template updated to v1.4 with business_ids guidance. |
 | 2.9 | 2026-04-15 | Added File Storage rule — all projects must use Platform API storage, not build their own. Strengthened version check mandate: Claude must check STANDARDS.md and CLAUDE-local.md regularly (not just at session start). Explicit mid-session notification rule added. Updated CLAUDE-local.md current version to 1.3. |
 | 2.8 | 2026-04-14 | Added Section 16 — full file versioning specification for STANDARDS.md, CLAUDE.md, and CLAUDE-local.md. Defined how versions are incremented and what Claude must do at session start. |
 | 2.6 | 2026-04-06 | Added Dapper snake_case + ::uuid cast rules, retired DATA_DICTIONARY.md, updated DB proxy instructions. |
@@ -699,6 +712,6 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 ---
 
 Last updated: 2026-04-15
-Version: 2.9
+Version: 3.0
 Maintained by: FlatPlanet-Hub
 One standard, every project, every person.

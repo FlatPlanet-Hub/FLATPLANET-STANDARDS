@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 2.6 | Last updated: 2026-04-06
+> Version: 2.7 | Last updated: 2026-04-15
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -535,6 +535,22 @@ JWT issuer: `flatplanet-security` | JWT audience: `flatplanet-apps`
 
 All inter-service (backend-to-backend) calls must use SP service tokens.
 
+### File Storage
+Projects must NOT build their own file upload endpoints or connect to Azure Blob Storage directly. All file storage goes through the FlatPlanet Platform API — this is mandatory.
+
+Platform API base URL: `https://flatplanet-api-freffxekdvb6hybs.southeastasia-01.azurewebsites.net`
+
+| Operation | Endpoint |
+|---|---|
+| Upload | `POST /api/v1/storage/upload` (multipart/form-data — fields: `file`, `businessCode`, `category`, `tags`) |
+| List | `GET /api/v1/storage/files?businessCode=fp&category=your-category` |
+| Get URL | `GET /api/v1/storage/files/{fileId}/url` |
+| Delete | `DELETE /api/v1/storage/files/{fileId}` |
+
+**All requests require:** `Authorization: Bearer <project API token from CLAUDE-local.md>`
+
+Files are automatically scoped to your project — your app can only see its own files. SAS URLs are time-limited (60 min) — always fetch a fresh URL before displaying, never hardcode or cache blob URLs.
+
 ---
 
 ## 15. Standards Maintenance
@@ -551,6 +567,33 @@ Review schedule:
 - Monthly: minor review
 - Quarterly: full review by all team leads
 - As needed: any team member can raise an update at any time
+
+### How Teams Are Notified of Updates
+
+There are two versioned files teams must stay current on. Both are checked automatically at every Claude session start.
+
+**STANDARDS.md** (this file)
+- Version number is at the top: `Version: 2.7`
+- Claude fetches this file from GitHub at the start of every session (Step 2 in CLAUDE-local.md)
+- If the version has changed since the last session, Claude must **tell the user** before doing anything else:
+  > ⚠️ FlatPlanet Standards have been updated (now v2.7). Read the changelog at the bottom of STANDARDS.md before we proceed.
+- The last entry in the CHANGELOG section below summarises what changed
+
+**CLAUDE-local.md** (project workspace file)
+- Version is embedded in the file: `<!-- CLAUDE_LOCAL_VERSION: 1.3 -->`
+- Claude checks this at Step 0 of every session
+- If the version is behind the latest, Claude tells the user:
+  > ⚠️ Your CLAUDE-local.md is outdated (you have v1.2, latest is v1.3). Please regenerate it from the FlatPlanet Hub before we proceed: `POST /api/projects/{id}/claude-config/regenerate`
+- User regenerates → gets new file with updated instructions and a fresh API token
+
+**Summary: users are always notified at session start. They never need to check manually.**
+
+### STANDARDS.md Version Changelog
+
+| Version | Date | What changed |
+|---|---|---|
+| 2.7 | 2026-04-15 | Added File Storage rule — all projects must use Platform API storage, not build their own. Added explicit user-notification rules for STANDARDS.md and CLAUDE-local.md version changes. |
+| 2.6 | 2026-04-06 | Added Dapper snake_case + ::uuid cast rules, retired DATA_DICTIONARY.md, updated DB proxy instructions |
 
 ---
 

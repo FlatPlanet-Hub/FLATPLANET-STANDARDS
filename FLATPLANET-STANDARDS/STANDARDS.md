@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 3.5 | Last updated: 2026-05-15
+> Version: 3.6 | Last updated: 2026-05-15
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -583,15 +583,21 @@ All inter-service (backend-to-backend) calls must use SP service tokens.
 
 The SP handles MFA server-side. The login response tells the frontend what to do next via two flags. Every login page must handle all three outcomes below — not just username/password.
 
+#### Who can log in and who cannot
+
+This is SP-controlled — the frontend does not decide. The frontend's job is to read the response flags and route accordingly.
+
+| User's MFA state | `requiresMfa` | `mfaEnrolmentPending` | Can access the app? | Frontend action |
+|---|---|---|---|---|
+| MFA not enabled | `false` | `false` | ✅ Yes — tokens in response | Store tokens, redirect |
+| MFA enabled, enrolled | `true` | `false` | ⏳ Not yet — must verify | Show TOTP/OTP input |
+| MFA enabled, not yet enrolled | `false` | `true` | ⏳ Not yet — must enrol first | Show enrolment flow |
+
+**Never hardcode this logic.** Always read the flags from the SP response — do not infer MFA state from user data or session storage.
+
 #### Login response flags
 
 `POST /api/v1/auth/login` always returns HTTP 200. Read the flags:
-
-| Flag | Value | What it means | What to do |
-|---|---|---|---|
-| `requiresMfa` | `false`, `mfaEnrolmentPending: false` | Normal login — tokens in response | Store tokens, redirect to app |
-| `requiresMfa` | `true` | User has MFA enabled — no tokens yet | Show TOTP input, call verify endpoint |
-| `mfaEnrolmentPending` | `true` | User must enrol in MFA before continuing | Show enrolment flow using the enrollment-only token |
 
 #### Flow 1 — MFA verify (user already enrolled)
 
@@ -687,7 +693,7 @@ Three files govern every FlatPlanet project session. Each is versioned so Claude
 
 | File | Current Version |
 |---|---|
-| `STANDARDS.md` | 3.5 |
+| `STANDARDS.md` | 3.6 |
 | `CLAUDE.md` | — (project-specific; committed to each repo without tokens) |
 | `CLAUDE-local.md` | 1.7 |
 
@@ -753,6 +759,7 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 
 | Version | Date | What changed |
 |---|---|---|
+| 3.6 | 2026-05-15 | Added explicit MFA access matrix — who can log in vs who is blocked based on MFA enabled/enrolled state. Clarified that SP controls this, not the frontend. |
 | 3.5 | 2026-05-15 | Expanded MFA section with full SP API flow — login response flags, TOTP verify, enrollment flow, fallback options (email OTP, backup codes). Developers now have everything they need to implement MFA without reading the SP API reference separately. |
 | 3.4 | 2026-05-15 | Added mandatory MFA rule to Authentication section. All login flows must implement the full SP MFA challenge-response flow — not just username/password. |
 | 3.3 | 2026-04-15 | Current Versions table updated to 3.3/1.7. CLAUDE.md policy clarified — every project has a committed token-free CLAUDE.md plus a CLAUDE-local.md for the live token. Stale "no CLAUDE.md in repos" statement corrected. |
@@ -766,6 +773,6 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 ---
 
 Last updated: 2026-05-15
-Version: 3.5
+Version: 3.6
 Maintained by: FlatPlanet-Hub
 One standard, every project, every person.

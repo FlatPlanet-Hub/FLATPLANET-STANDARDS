@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 3.4 | Last updated: 2026-05-15
+> Version: 3.5 | Last updated: 2026-05-15
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -581,13 +581,48 @@ All inter-service (backend-to-backend) calls must use SP service tokens.
 
 **MFA is mandatory — every login flow must support it.**
 
-The SP handles MFA server-side. The frontend login flow must handle the MFA challenge response — it cannot assume the access token is returned in a single step. If a user has MFA enabled, the SP login endpoint returns a challenge instead of a token. The frontend must prompt the user to complete the MFA step before the session is established.
+The SP handles MFA server-side. The login response tells the frontend what to do next via two flags. Every login page must handle all three outcomes below — not just username/password.
 
-Rules:
-- All login pages must implement the full MFA challenge-response flow — not just username/password
-- A user with MFA enabled cannot log in without completing the MFA step — do not treat an MFA challenge as an error
-- Never bypass or skip the MFA step on the assumption that a user "doesn't have it set up" — that is an SP-side configuration, not something the frontend controls
-- Refer to the SP API reference for the exact MFA challenge endpoint and response shape: https://github.com/FlatPlanet-Hub/flatplanet-security-platform/blob/main/docs/security-api-reference.md
+#### Login response flags
+
+`POST /api/v1/auth/login` always returns HTTP 200. Read the flags:
+
+| Flag | Value | What it means | What to do |
+|---|---|---|---|
+| `requiresMfa` | `false`, `mfaEnrolmentPending: false` | Normal login — tokens in response | Store tokens, redirect to app |
+| `requiresMfa` | `true` | User has MFA enabled — no tokens yet | Show TOTP input, call verify endpoint |
+| `mfaEnrolmentPending` | `true` | User must enrol in MFA before continuing | Show enrolment flow using the enrollment-only token |
+
+#### Flow 1 — MFA verify (user already enrolled)
+
+When `requiresMfa: true`, the response contains `userId` but no tokens. Prompt for the TOTP code then call:
+
+```
+POST /api/v1/mfa/totp/login-verify
+Body: { "userId": "...", "totpCode": "483921" }
+```
+
+Returns the full login response with tokens. Store and proceed.
+
+**Fallback options** — show "having trouble?" links:
+- Email OTP: `POST /api/v1/mfa/totp/request-email-fallback` → get `challengeId` → verify with `POST /api/v1/mfa/email-otp/login-verify`
+- Backup code: `POST /api/v1/mfa/backup-code/login-verify` with `{ "userId": "...", "backupCode": "..." }`
+
+#### Flow 2 — MFA enrolment (first login or after admin reset)
+
+When `mfaEnrolmentPending: true`, the response contains an **enrollment-only token** (valid 10 min). This token only works on MFA enrolment endpoints — all other calls return 403.
+
+1. Call `POST /api/v1/mfa/totp/begin-enrol` (Bearer: enrollment token) → get `qrCodeUri`
+2. Show QR code to user (use any QR library — the URI is an `otpauth://` string)
+3. User scans with authenticator app and enters the 6-digit code
+4. Call `POST /api/v1/mfa/totp/verify-enrol` with `{ "totpCode": "..." }` → returns full login response with tokens
+5. Store tokens and redirect to app
+
+#### Rules
+- Do not treat `requiresMfa: true` as an error — it is a normal login step
+- Do not skip enrolment — users with `mfaEnrolmentPending: true` cannot access the app until enrolled
+- Never store the enrollment-only token the same way as a real access token — it must not grant app access
+- Backup codes are shown once and are single-use — prompt the user to save them during enrolment
 
 **JWT Business Membership Claims**
 
@@ -652,7 +687,7 @@ Three files govern every FlatPlanet project session. Each is versioned so Claude
 
 | File | Current Version |
 |---|---|
-| `STANDARDS.md` | 3.4 |
+| `STANDARDS.md` | 3.5 |
 | `CLAUDE.md` | — (project-specific; committed to each repo without tokens) |
 | `CLAUDE-local.md` | 1.7 |
 
@@ -718,6 +753,7 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 
 | Version | Date | What changed |
 |---|---|---|
+| 3.5 | 2026-05-15 | Expanded MFA section with full SP API flow — login response flags, TOTP verify, enrollment flow, fallback options (email OTP, backup codes). Developers now have everything they need to implement MFA without reading the SP API reference separately. |
 | 3.4 | 2026-05-15 | Added mandatory MFA rule to Authentication section. All login flows must implement the full SP MFA challenge-response flow — not just username/password. |
 | 3.3 | 2026-04-15 | Current Versions table updated to 3.3/1.7. CLAUDE.md policy clarified — every project has a committed token-free CLAUDE.md plus a CLAUDE-local.md for the live token. Stale "no CLAUDE.md in repos" statement corrected. |
 | 3.2 | 2026-04-15 | Gap analysis fixes — CLAUDE-local.md template bumped to v1.7: Delete returns 200 not 204, businessCode marked required on List, response envelope shape documented, JWT normalization pattern added (single-membership = plain string not array). |
@@ -730,6 +766,6 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 ---
 
 Last updated: 2026-05-15
-Version: 3.4
+Version: 3.5
 Maintained by: FlatPlanet-Hub
 One standard, every project, every person.

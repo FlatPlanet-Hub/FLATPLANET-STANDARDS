@@ -1,5 +1,5 @@
 # FLATPLANET Standards
-> Version: 3.3 | Last updated: 2026-04-15
+> Version: 3.4 | Last updated: 2026-05-15
 > Repository: https://github.com/FlatPlanet-Hub/FLATPLANET-STANDARDS
 
 ---
@@ -579,6 +579,16 @@ JWT issuer: `flatplanet-security` | JWT audience: `flatplanet-apps`
 
 All inter-service (backend-to-backend) calls must use SP service tokens.
 
+**MFA is mandatory — every login flow must support it.**
+
+The SP handles MFA server-side. The frontend login flow must handle the MFA challenge response — it cannot assume the access token is returned in a single step. If a user has MFA enabled, the SP login endpoint returns a challenge instead of a token. The frontend must prompt the user to complete the MFA step before the session is established.
+
+Rules:
+- All login pages must implement the full MFA challenge-response flow — not just username/password
+- A user with MFA enabled cannot log in without completing the MFA step — do not treat an MFA challenge as an error
+- Never bypass or skip the MFA step on the assumption that a user "doesn't have it set up" — that is an SP-side configuration, not something the frontend controls
+- Refer to the SP API reference for the exact MFA challenge endpoint and response shape: https://github.com/FlatPlanet-Hub/flatplanet-security-platform/blob/main/docs/security-api-reference.md
+
 **JWT Business Membership Claims**
 
 The SP JWT contains two parallel claims for business membership:
@@ -642,7 +652,7 @@ Three files govern every FlatPlanet project session. Each is versioned so Claude
 
 | File | Current Version |
 |---|---|
-| `STANDARDS.md` | 3.2 |
+| `STANDARDS.md` | 3.4 |
 | `CLAUDE.md` | — (project-specific; committed to each repo without tokens) |
 | `CLAUDE-local.md` | 1.7 |
 
@@ -708,6 +718,7 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 
 | Version | Date | What changed |
 |---|---|---|
+| 3.4 | 2026-05-15 | Added mandatory MFA rule to Authentication section. All login flows must implement the full SP MFA challenge-response flow — not just username/password. |
 | 3.3 | 2026-04-15 | Current Versions table updated to 3.3/1.7. CLAUDE.md policy clarified — every project has a committed token-free CLAUDE.md plus a CLAUDE-local.md for the live token. Stale "no CLAUDE.md in repos" statement corrected. |
 | 3.2 | 2026-04-15 | Gap analysis fixes — CLAUDE-local.md template bumped to v1.7: Delete returns 200 not 204, businessCode marked required on List, response envelope shape documented, JWT normalization pattern added (single-membership = plain string not array). |
 | 3.1 | 2026-04-15 | Added rule: Platform API responses are camelCase — always use `JsonNamingPolicy.CamelCase` when deserializing. Documents a real production bug where snake_case assumption caused all fields to silently return null. CLAUDE-local.md template bumped to v1.6. |
@@ -718,7 +729,7 @@ Do not proceed with the outdated file if the version gap is more than one minor 
 
 ---
 
-Last updated: 2026-04-15
-Version: 3.0
+Last updated: 2026-05-15
+Version: 3.4
 Maintained by: FlatPlanet-Hub
 One standard, every project, every person.

@@ -134,9 +134,14 @@ Rules:
 
 ### 3.x — Raising Pull Requests from Claude Code
 
-When the `gh` CLI is not available, Claude must raise pull requests via the GitHub API using credentials from the git credential manager. Do not tell the user to do it manually. Do not protest that it cannot be done.
+When the user asks Claude to raise a PR, Claude handles it end-to-end — the user should not need to do it manually.
 
-The correct approach:
+**Preferred:** Use the `gh` CLI if available:
+```bash
+gh pr create --title "..." --base main --head feature/branch-name --body "..."
+```
+
+**Fallback:** If `gh` is not installed, use the GitHub API directly:
 
 1. Retrieve credentials:
 ```bash
@@ -165,7 +170,7 @@ PAYLOAD
 
 3. Return the `html_url` from the response to the user.
 
-**Rule:** If `gh` is not installed, fall straight to this method. Never ask the user to raise the PR themselves unless the API call fails.
+**Rule:** Always confirm the PR title, base branch, and description with the user before raising — a brief confirmation ("Raising PR: {title} → main, OK?") is enough. Then raise it end-to-end and return the link. Only ask the user to raise it themselves if both `gh` and the API call fail.
 
 
 ### Releases
